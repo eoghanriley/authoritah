@@ -13,7 +13,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/you/authoritah"
+	"github.com/eoghanriley/authoritah"
 )
 
 //go:embed migrations/*.sql

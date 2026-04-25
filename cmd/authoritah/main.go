@@ -13,7 +13,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/you/authoritah/internal/migrate"
+	"github.com/eoghanriley/authoritah/internal/migrate"
 )
 
 func main() {

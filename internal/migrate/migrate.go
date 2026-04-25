@@ -7,9 +7,9 @@ import (
 	"database/sql"
 	"fmt"
 
+	"github.com/eoghanriley/authoritah/pkg/authoritah"
 	_ "github.com/lib/pq" // postgres driver
 	"github.com/pressly/goose/v3"
-	"github.com/you/authoritah/pkg/authoritah"
 )
 
 // Run executes a goose command ("up", "down", "status") against the given DSN.

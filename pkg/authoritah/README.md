@@ -7,7 +7,7 @@ A modular, plugin-based authentication library for Go HTTP services. Inspired by
 ## Installation
 
 ```bash
-go get github.com/you/authoritah
+go get github.com/eoghanriley/authoritah
 ```
 
 Requires Go 1.22 or later.
@@ -24,10 +24,10 @@ import (
     "log"
     "net/http"
 
-    "github.com/you/authoritah/pkg/authoritah"
-    "github.com/you/authoritah/pkg/plugins/credentials"
-    "github.com/you/authoritah/pkg/plugins/oauth"
-    "github.com/you/authoritah/pkg/adapters/gorm"
+    "github.com/eoghanriley/authoritah/pkg/authoritah"
+    "github.com/eoghanriley/authoritah/pkg/plugins/credentials"
+    "github.com/eoghanriley/authoritah/pkg/plugins/oauth"
+    "github.com/eoghanriley/authoritah/pkg/adapters/gorm"
 )
 
 func main() {

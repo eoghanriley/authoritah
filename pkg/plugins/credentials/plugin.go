@@ -10,7 +10,7 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/you/authoritah"
+	"github.com/eoghanriley/authoritah"
 	"golang.org/x/crypto/bcrypt"
 )
 
