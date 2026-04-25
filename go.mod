@@ -1,4 +1,4 @@
-module github.com/you/authoritah
+module github.com/eoghanriley/authoritah
 
 go 1.24.0
 

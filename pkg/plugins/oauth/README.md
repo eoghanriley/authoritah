@@ -11,7 +11,7 @@ Ships with a [Google](#google) provider. Additional providers (GitHub, Discord, 
 ## Installation
 
 ```go
-import "github.com/you/authoritah/pkg/plugins/oauth"
+import "github.com/eoghanriley/authoritah/pkg/plugins/oauth"
 ```
 
 ---
