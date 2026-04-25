@@ -9,7 +9,7 @@ Provides sign-up, sign-in, and sign-out endpoints. Passwords are hashed with [bc
 ## Installation
 
 ```go
-import "github.com/you/authoritah/pkg/plugins/credentials"
+import "github.com/eoghanriley/authoritah/pkg/plugins/credentials"
 ```
 
 ---
