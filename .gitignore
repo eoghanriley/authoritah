@@ -1,0 +1,17 @@
+# Binaries
+build/bin/
+*.exe
+*.out
+
+# Module cache
+vendor/
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# IDE
+.idea/
+.vscode/
+*.swp
