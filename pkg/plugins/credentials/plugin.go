@@ -53,8 +53,8 @@ func New(opts ...Option) *Plugin {
 	return p
 }
 
-func (p *Plugin) ID() string            { return "credentials" }
-func (p *Plugin) Migrations() *embed.FS { return &migrations }
+func (p *Plugin) ID() string           { return "credentials" }
+func (p *Plugin) Migrations() embed.FS { return migrations }
 
 func (p *Plugin) Init(a *authoritah.Auth) error {
 	db, ok := a.DB().(CredentialsDatabase)

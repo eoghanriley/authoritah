@@ -23,13 +23,13 @@ type Plugin interface {
 // Migrator is an optional interface plugins implement when they own database
 // tables. The embedded FS should contain *.sql goose migration files.
 type Migrator interface {
-	Migrations() *embed.FS
+	Migrations() embed.FS
 }
 
 // Route describes a single HTTP endpoint a plugin exposes.
 type Route struct {
-	Method  string           // "GET", "POST", etc.
-	Path    string           // e.g. "/oauth/google/callback"
+	Method  string // "GET", "POST", etc.
+	Path    string // e.g. "/oauth/google/callback"
 	Handler HandlerFunc
 }
 
@@ -42,10 +42,10 @@ type HandlerFunc func(a *Auth) func(w ResponseWriter, r *Request)
 type HookType string
 
 const (
-	HookBeforeSignUp HookType = "before_sign_up"
-	HookAfterSignUp  HookType = "after_sign_up"
-	HookBeforeSignIn HookType = "before_sign_in"
-	HookAfterSignIn  HookType = "after_sign_in"
+	HookBeforeSignUp  HookType = "before_sign_up"
+	HookAfterSignUp   HookType = "after_sign_up"
+	HookBeforeSignIn  HookType = "before_sign_in"
+	HookAfterSignIn   HookType = "after_sign_in"
 	HookBeforeSignOut HookType = "before_sign_out"
 	HookAfterSignOut  HookType = "after_sign_out"
 )

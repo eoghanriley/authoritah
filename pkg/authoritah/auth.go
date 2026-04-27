@@ -168,7 +168,7 @@ func (a *Auth) RunHooks(ctx context.Context, hook HookType, data HookData) error
 // implement Migrator. Each plugin gets its own tracking table so version
 // sequences are fully independent.
 func (a *Auth) Migrate(ctx context.Context) error {
-	if err := a.runMigrations(ctx, "core", &coreMigrations); err != nil {
+	if err := a.runMigrations(ctx, "core", coreMigrations); err != nil {
 		return fmt.Errorf("authoritah: core migrations: %w", err)
 	}
 	for _, p := range a.plugins {
@@ -183,7 +183,7 @@ func (a *Auth) Migrate(ctx context.Context) error {
 	return nil
 }
 
-func (a *Auth) runMigrations(ctx context.Context, pluginID string, fs *embed.FS) error {
+func (a *Auth) runMigrations(ctx context.Context, pluginID string, fs embed.FS) error {
 	provider, err := goose.NewProvider(
 		goose.Dialect(a.config.GooseMigrationDialect),
 		a.db.SQLDB(),
