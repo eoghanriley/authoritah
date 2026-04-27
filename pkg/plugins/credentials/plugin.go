@@ -14,8 +14,11 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-//go:embed migrations/*.sql
-var migrations embed.FS
+//go:embed migrations/postgres/*.sql
+var postgresMigrations embed.FS
+
+//go:embed migrations/sqlite/*.sql
+var sqliteMigrations embed.FS
 
 // CredentialsDatabase extends authoritah.Database with password storage.
 // Your adapter must implement this interface for the credentials plugin.
@@ -53,8 +56,16 @@ func New(opts ...Option) *Plugin {
 	return p
 }
 
-func (p *Plugin) ID() string           { return "credentials" }
-func (p *Plugin) Migrations() embed.FS { return migrations }
+func (p *Plugin) ID() string { return "credentials" }
+
+func (p *Plugin) Migrations(dialect string) (embed.FS, string) {
+	switch dialect {
+	case "sqlite3":
+		return sqliteMigrations, "migrations/sqlite"
+	default:
+		return postgresMigrations, "migrations/postgres"
+	}
+}
 
 func (p *Plugin) Init(a *authoritah.Auth) error {
 	db, ok := a.DB().(CredentialsDatabase)

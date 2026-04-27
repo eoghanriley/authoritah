@@ -16,8 +16,11 @@ import (
 	"github.com/eoghanriley/authoritah/pkg/authoritah"
 )
 
-//go:embed migrations/*.sql
-var migrations embed.FS
+//go:embed migrations/postgres/*.sql
+var postgresMigrations embed.FS
+
+//go:embed migrations/sqlite/*.sql
+var sqliteMigrations embed.FS
 
 // OAuthDatabase extends authoritah.Database with OAuth account storage.
 type OAuthDatabase interface {
@@ -84,8 +87,16 @@ func New(opts ...Option) *Plugin {
 	return p
 }
 
-func (p *Plugin) ID() string           { return "oauth" }
-func (p *Plugin) Migrations() embed.FS { return migrations }
+func (p *Plugin) ID() string { return "oauth" }
+
+func (p *Plugin) Migrations(dialect string) (embed.FS, string) {
+	switch dialect {
+	case "sqlite3":
+		return sqliteMigrations, "migrations/sqlite"
+	default:
+		return postgresMigrations, "migrations/postgres"
+	}
+}
 
 func (p *Plugin) Init(a *authoritah.Auth) error {
 	db, ok := a.DB().(OAuthDatabase)

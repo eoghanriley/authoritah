@@ -23,7 +23,7 @@ type Plugin interface {
 // Migrator is an optional interface plugins implement when they own database
 // tables. The embedded FS should contain *.sql goose migration files.
 type Migrator interface {
-	Migrations() embed.FS
+	Migrations(dialect string) (embed.FS, string)
 }
 
 // Route describes a single HTTP endpoint a plugin exposes.

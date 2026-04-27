@@ -1,0 +1,29 @@
+-- +goose Up
+CREATE TABLE IF NOT EXISTS users (
+    id         TEXT     PRIMARY KEY,
+    email      TEXT     NOT NULL UNIQUE,
+    name       TEXT     NOT NULL DEFAULT '',
+    avatar_url TEXT     NOT NULL DEFAULT '',
+    created_at DATETIME NOT NULL DEFAULT (datetime('now')),
+    updated_at DATETIME NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS sessions (
+    id         TEXT     PRIMARY KEY,
+    user_id    TEXT     NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token      TEXT     NOT NULL UNIQUE,
+    user_agent TEXT     NOT NULL DEFAULT '',
+    ip_address TEXT     NOT NULL DEFAULT '',
+    meta       TEXT     NOT NULL DEFAULT '{}',
+    expires_at DATETIME NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS sessions_user_id_idx ON sessions(user_id);
+CREATE INDEX IF NOT EXISTS sessions_token_idx   ON sessions(token);
+
+-- +goose Down
+DROP INDEX IF EXISTS sessions_token_idx;
+DROP INDEX IF EXISTS sessions_user_id_idx;
+DROP TABLE IF EXISTS sessions;
+DROP TABLE IF EXISTS users;
