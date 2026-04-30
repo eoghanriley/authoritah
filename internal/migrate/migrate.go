@@ -6,6 +6,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"io/fs"
 
 	"github.com/eoghanriley/authoritah/pkg/authoritah"
 	_ "github.com/lib/pq" // postgres driver
@@ -26,13 +27,15 @@ func Run(ctx context.Context, dsn, command string) error {
 		return fmt.Errorf("ping db: %w", err)
 	}
 
-	// Reuse the same embedded migrations from the public package
-	_ = authoritah.CoreMigrations // see note in pkg/authoritah/migrations.go
+	fsys, err := fs.Sub(authoritah.CoreMigrations("postgres"), "migrations/postgres")
+	if err != nil {
+		return fmt.Errorf("sub migrations fs: %w", err)
+	}
 
 	provider, err := goose.NewProvider(
 		goose.DialectPostgres,
 		db,
-		authoritah.CoreMigrations,
+		fsys,
 		goose.WithTableName("authoritah_migrations_core"),
 	)
 	if err != nil {
