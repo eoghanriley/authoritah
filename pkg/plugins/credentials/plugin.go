@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"time"
 
 	"github.com/eoghanriley/authoritah/pkg/authoritah"
 	"golang.org/x/crypto/bcrypt"
@@ -130,7 +131,8 @@ func (p *Plugin) handleSignUp(a *authoritah.Auth) func(http.ResponseWriter, *htt
 			return
 		}
 
-		user := &authoritah.User{ID: generateID(), Email: req.Email, Name: req.Name}
+		now := time.Now()
+		user := &authoritah.User{ID: generateID(), Email: req.Email, Name: req.Name, CreatedAt: now, UpdatedAt: now}
 		if err := p.db.CreateUser(ctx, user); err != nil {
 			httpError(w, "internal error", http.StatusInternalServerError)
 			return
