@@ -9,13 +9,17 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"time"
 
-	"github.com/eoghanriley/authoritah"
+	"github.com/eoghanriley/authoritah/pkg/authoritah"
 	"golang.org/x/crypto/bcrypt"
 )
 
-//go:embed migrations/*.sql
-var migrations embed.FS
+//go:embed migrations/postgres/*.sql
+var postgresMigrations embed.FS
+
+//go:embed migrations/sqlite/*.sql
+var sqliteMigrations embed.FS
 
 // CredentialsDatabase extends authoritah.Database with password storage.
 // Your adapter must implement this interface for the credentials plugin.
@@ -53,8 +57,16 @@ func New(opts ...Option) *Plugin {
 	return p
 }
 
-func (p *Plugin) ID() string            { return "credentials" }
-func (p *Plugin) Migrations() *embed.FS { return &migrations }
+func (p *Plugin) ID() string { return "credentials" }
+
+func (p *Plugin) Migrations(dialect string) (embed.FS, string) {
+	switch dialect {
+	case "sqlite3":
+		return sqliteMigrations, "migrations/sqlite"
+	default:
+		return postgresMigrations, "migrations/postgres"
+	}
+}
 
 func (p *Plugin) Init(a *authoritah.Auth) error {
 	db, ok := a.DB().(CredentialsDatabase)
@@ -69,7 +81,7 @@ func (p *Plugin) Routes() []authoritah.Route {
 	return []authoritah.Route{
 		{Method: "POST", Path: "/credentials/sign-up", Handler: p.handleSignUp},
 		{Method: "POST", Path: "/credentials/sign-in", Handler: p.handleSignIn},
-		{Method: "POST", Path: "/credentials/sign-out", Handler: p.handleSignOut},
+		{Method: "POST", Path: "/credentials/sign-out", Handler: p.handleSignOut, RequireAuth: true},
 	}
 }
 
@@ -119,7 +131,8 @@ func (p *Plugin) handleSignUp(a *authoritah.Auth) func(http.ResponseWriter, *htt
 			return
 		}
 
-		user := &authoritah.User{ID: generateID(), Email: req.Email, Name: req.Name}
+		now := time.Now()
+		user := &authoritah.User{ID: generateID(), Email: req.Email, Name: req.Name, CreatedAt: now, UpdatedAt: now}
 		if err := p.db.CreateUser(ctx, user); err != nil {
 			httpError(w, "internal error", http.StatusInternalServerError)
 			return

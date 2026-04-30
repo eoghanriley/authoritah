@@ -1,5 +1,14 @@
 package authoritah
 
-// CoreMigrations exposes the embedded core migration filesystem so the CLI
-// (internal/migrate) can run them independently of a full Auth instance.
-var CoreMigrations = &coreMigrations
+import "embed"
+
+// CoreMigrations exposes the embedded migration filesystem for the CLI.
+// Dialect must be "sqlite3" or "postgres".
+func CoreMigrations(dialect string) embed.FS {
+	switch dialect {
+	case "sqlite3":
+		return sqliteMigrations
+	default:
+		return postgresMigrations
+	}
+}

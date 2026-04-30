@@ -17,6 +17,7 @@ import (
 	"context"
 	"embed"
 	"fmt"
+	"io/fs"
 	"log/slog"
 	"net/http"
 	"sync"
@@ -24,8 +25,11 @@ import (
 	"github.com/pressly/goose/v3"
 )
 
-//go:embed migrations/*.sql
-var coreMigrations embed.FS
+//go:embed migrations/postgres/*.sql
+var postgresMigrations embed.FS
+
+//go:embed migrations/sqlite/*.sql
+var sqliteMigrations embed.FS
 
 // Auth is the central authoritah instance. Create one with New() and mount
 // it into your router. Safe for concurrent use after initialization.
@@ -164,11 +168,18 @@ func (a *Auth) RunHooks(ctx context.Context, hook HookType, data HookData) error
 	return nil
 }
 
-// Migrate runs goose migrations for the core schema and all plugins that
-// implement Migrator. Each plugin gets its own tracking table so version
-// sequences are fully independent.
+func (a *Auth) coreMigrations() (embed.FS, string) {
+	switch a.config.GooseMigrationDialect {
+	case "sqlite3":
+		return sqliteMigrations, "migrations/sqlite"
+	default:
+		return postgresMigrations, "migrations/postgres"
+	}
+}
+
 func (a *Auth) Migrate(ctx context.Context) error {
-	if err := a.runMigrations(ctx, "core", &coreMigrations); err != nil {
+	fsys, dir := a.coreMigrations()
+	if err := a.runMigrations(ctx, "core", fsys, dir); err != nil {
 		return fmt.Errorf("authoritah: core migrations: %w", err)
 	}
 	for _, p := range a.plugins {
@@ -176,18 +187,23 @@ func (a *Auth) Migrate(ctx context.Context) error {
 		if !ok {
 			continue
 		}
-		if err := a.runMigrations(ctx, p.ID(), m.Migrations()); err != nil {
+		fsys, dir := m.Migrations(a.config.GooseMigrationDialect)
+		if err := a.runMigrations(ctx, p.ID(), fsys, dir); err != nil {
 			return fmt.Errorf("authoritah: plugin %q migrations: %w", p.ID(), err)
 		}
 	}
 	return nil
 }
 
-func (a *Auth) runMigrations(ctx context.Context, pluginID string, fs *embed.FS) error {
+func (a *Auth) runMigrations(ctx context.Context, pluginID string, fsys embed.FS, dir string) error {
+	sub, err := fs.Sub(fsys, dir)
+	if err != nil {
+		return fmt.Errorf("authoritah: sub fs %q: %w", dir, err)
+	}
 	provider, err := goose.NewProvider(
 		goose.Dialect(a.config.GooseMigrationDialect),
 		a.db.SQLDB(),
-		fs,
+		sub,
 		goose.WithTableName("authoritah_migrations_"+pluginID),
 	)
 	if err != nil {
@@ -211,7 +227,10 @@ func (a *Auth) mountRoutes(p Plugin) {
 	for _, route := range p.Routes() {
 		pattern := route.Method + " " + route.Path
 		handler := route.Handler(a)
+		if route.RequireAuth {
+			handler = a.RequireAuth(http.HandlerFunc(handler)).ServeHTTP
+		}
 		a.mux.HandleFunc(pattern, handler)
-		a.logger.Info("authoritah: route mounted", "plugin", p.ID(), "pattern", pattern)
+		a.logger.Info("authoritah: route mounted", "plugin", p.ID(), "pattern", pattern, "requires auth", route.RequireAuth)
 	}
 }
