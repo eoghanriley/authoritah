@@ -80,7 +80,7 @@ func (p *Plugin) Routes() []authoritah.Route {
 	return []authoritah.Route{
 		{Method: "POST", Path: "/credentials/sign-up", Handler: p.handleSignUp},
 		{Method: "POST", Path: "/credentials/sign-in", Handler: p.handleSignIn},
-		{Method: "POST", Path: "/credentials/sign-out", Handler: p.handleSignOut},
+		{Method: "POST", Path: "/credentials/sign-out", Handler: p.handleSignOut, RequireAuth: true},
 	}
 }
 

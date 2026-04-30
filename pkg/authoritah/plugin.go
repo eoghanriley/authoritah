@@ -28,9 +28,10 @@ type Migrator interface {
 
 // Route describes a single HTTP endpoint a plugin exposes.
 type Route struct {
-	Method  string // "GET", "POST", etc.
-	Path    string // e.g. "/oauth/google/callback"
-	Handler HandlerFunc
+	Method      string // "GET", "POST", etc.
+	Path        string // e.g. "/oauth/google/callback"
+	Handler     HandlerFunc
+	RequireAuth bool
 }
 
 // HandlerFunc is the standard handler signature used across authoritah.

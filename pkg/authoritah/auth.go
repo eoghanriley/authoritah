@@ -227,7 +227,10 @@ func (a *Auth) mountRoutes(p Plugin) {
 	for _, route := range p.Routes() {
 		pattern := route.Method + " " + route.Path
 		handler := route.Handler(a)
+		if route.RequireAuth {
+			handler = a.RequireAuth(http.HandlerFunc(handler)).ServeHTTP
+		}
 		a.mux.HandleFunc(pattern, handler)
-		a.logger.Info("authoritah: route mounted", "plugin", p.ID(), "pattern", pattern)
+		a.logger.Info("authoritah: route mounted", "plugin", p.ID(), "pattern", pattern, "requires auth", route.RequireAuth)
 	}
 }
