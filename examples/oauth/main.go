@@ -31,6 +31,10 @@ func main() {
 						os.Getenv("GITHUB_CLIENT_ID"),
 						os.Getenv("GITHUB_CLIENT_SECRET"),
 						"http://localhost:8080/auth/oauth/github/callback",
+						oauth.WithGitHubScopes(
+							oauth.GitHubScopeReadUser,
+							oauth.GitHubScopeUserEmail,
+						),
 					),
 				),
 			),

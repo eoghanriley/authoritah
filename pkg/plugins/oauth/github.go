@@ -15,14 +15,101 @@ import (
 type GitHubScope string
 
 const (
-	// GitHubScopeReadUser grants read access to a user's profile data.
-	GitHubScopeReadUser GitHubScope = "read:user"
-	// GitHubScopeUserEmail grants read access to a user's email addresses.
-	GitHubScopeUserEmail GitHubScope = "user:email"
+	// For a list of all scopes https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/scopes-for-oauth-apps
+
 	// GitHubScopeRepo grants full access to public and private repositories.
 	GitHubScopeRepo GitHubScope = "repo"
-	// GitHubScopePublicRepo grants access to public repositories only.
+
+	// GitHubScopeRepoStatus grants read/write access to commit statuses in public and private repositories.
+	GitHubScopeRepoStatus GitHubScope = "repo:status"
+
+	// GitHubScopeRepoDeployment grants access to deployment statuses for public and private repositories.
+	GitHubScopeRepoDeployment GitHubScope = "repo_deployment"
+
+	// GitHubScopePublicRepo limits access to public repositories.
 	GitHubScopePublicRepo GitHubScope = "public_repo"
+
+	// GitHubScopeRepoInvite grants accept/decline abilities for invitations to collaborate on a repository.
+	GitHubScopeRepoInvite GitHubScope = "repo:invite"
+
+	// GitHubScopeSecurityEvents grants read and write access to security events in the code scanning API.
+	GitHubScopeSecurityEvents GitHubScope = "security_events"
+
+	// GitHubScopeAdminRepoHook grants read, write, ping, and delete access to repository hooks in public or private repositories.
+	GitHubScopeAdminRepoHook GitHubScope = "admin:repo_hook"
+
+	// GitHubScopeWriteRepoHook grants read, write, and ping access to hooks in public or private repositories
+	GitHubScopeWriteRepoHook GitHubScope = "write:repo_hook"
+
+	// GitHubScopeReadRepoHook grants read and ping access to hooks in public or private repositories.
+	GitHubScopeReadRepoHook GitHubScope = "read:repo_hook"
+
+	// GitHubScopeAdminOrg fully manage the organization and its teams, projects, and memberships.
+	GitHubScopeAdminOrg GitHubScope = "admin:org"
+
+	// GitHubScopeWriteOrg read and write access to organization membership and organization projects.
+	GitHubScopeWriteOrg GitHubScope = "write:org"
+
+	// GitHubScopeReadOrg read-only access to organization membership, organization projects, and team membership.
+	GitHubScopeReadOrg GitHubScope = "read:org"
+
+	// GitHubScopeAdminOrgHook grants read, write, ping, and delete access to organization hooks.
+	GitHubScopeAdminOrgHook GitHubScope = "admin:org_hook"
+
+	// GitHubScopeGist grants write access to gists.
+	GitHubScopeGist GitHubScope = "gist"
+
+	// GitHubScopeNotifications Grants read access to a user's notifications mark as read access to threads
+	// watch and unwatch access to a repository, and read, write, and delete access to thread subscriptions.
+	GitHubScopeNotifications GitHubScope = "notifications"
+
+	// GitHubScopeUser Grants read/write access to profile info only.
+	GitHubScopeUser GitHubScope = "user"
+
+	// GitHubScopeReadUser grants read access to a user's profile data.
+	GitHubScopeReadUser GitHubScope = "read:user"
+
+	// GitHubScopeUserEmail grants read access to a user's email addresses.
+	GitHubScopeUserEmail GitHubScope = "user:email"
+
+	// GitHubScopeUserFollow grants access to follow or unfollow other users.
+	GitHubScopeUserFollow GitHubScope = "user:follow"
+
+	// GitHubScopeProject grants read/write access to user and organization projects.
+	GitHubScopeProject GitHubScope = "project"
+
+	// GitHubScopeReadProject grants read only access to user and organization projects.
+	GitHubScopeReadProject GitHubScope = "read:project"
+
+	// GitHubScopeDeleteRepo grants access to delete adminable repositories.
+	GitHubScopeDeleteRepo GitHubScope = "delete_repo"
+
+	// GitHubScopeWritePackages grants access to upload or publish a package in GitHub Packages.
+	GitHubScopeWritePackages GitHubScope = "write:packages"
+
+	// GitHubScopeReadPackages grants access to download or install packages from GitHub Packages.
+	GitHubScopeReadPackages GitHubScope = "read:packages"
+
+	// GitHubScopeDeletePackages grants access to delete packages from GitHub Packages.
+	GitHubScopeDeletePackages GitHubScope = "delete:packages"
+
+	// GitHubScopeAdminGPGKey fully manage GPG keys.
+	GitHubScopeAdminGPGKey GitHubScope = "admin:gpg_key"
+
+	// GitHubScopeWriteGPGKey create, list, and view details for GPG keys.
+	GitHubScopeWriteGPGKey GitHubScope = "write:gpg_key"
+
+	// GitHubScopeReadGPGKey list and view details for GPG keys.
+	GitHubScopeReadGPGKey GitHubScope = "read:gpg_key"
+
+	// GitHubScopeCodespace grants the ability to create and manage codespaces.
+	GitHubScopeCodespace GitHubScope = "codespace"
+
+	// GitHubScopeWorkflow grants the ability to add and update GitHub Actions workflow files.
+	GitHubScopeWorkflow GitHubScope = "workflow"
+
+	// GitHubScopeReadAuditLog Read audit log data.
+	GitHubScopeReadAuditLog GitHubScope = "read:audit_log"
 )
 
 // --- Provider -------------------------------------------------------
@@ -57,13 +144,17 @@ func WithGitHubScopes(scopes ...GitHubScope) GitHubOption {
 //	    os.Getenv("GITHUB_CLIENT_ID"),
 //	    os.Getenv("GITHUB_CLIENT_SECRET"),
 //	    "http://localhost:8080/auth/oauth/github/callback",
+//		oauth.WithGitHubScopes(
+//			oauth.GitHubScopeReadUser,
+//			oauth.GitHubScopeRepo,
+//		),
 //	)
 func NewGitHub(clientID, clientSecret, redirectURL string, opts ...GitHubOption) *GitHubProvider {
 	g := &GitHubProvider{
 		clientID:     clientID,
 		clientSecret: clientSecret,
 		redirectURL:  redirectURL,
-		scopes:       []GitHubScope{GitHubScopeReadUser, GitHubScopeUserEmail},
+		scopes:       []GitHubScope{},
 	}
 	for _, o := range opts {
 		o(g)
