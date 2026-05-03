@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/eoghanriley/authoritah/pkg/authoritah"
+	"github.com/eoghanriley/authoritah/pkg/plugins/oauth"
 	_ "modernc.org/sqlite"
 )
 
@@ -190,4 +191,54 @@ func scanSession(row *sql.Row) (*authoritah.Session, error) {
 
 func isUniqueErr(err error) bool {
 	return err != nil && strings.Contains(strings.ToLower(err.Error()), "unique")
+}
+
+func (a *Adapter) GetOAuthAccount(ctx context.Context, provider, providerID string) (*oauth.Account, error) {
+	row := a.db.QueryRowContext(ctx,
+		`SELECT id, user_id, provider, provider_id, created_at
+		 FROM oauth_accounts WHERE provider = ? AND provider_id = ?`,
+		provider, providerID,
+	)
+	acc := &oauth.Account{}
+	err := row.Scan(&acc.ID, &acc.UserID, &acc.Provider, &acc.ProviderID, &acc.CreatedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, fmt.Errorf("oauth account not found")
+	}
+	if err != nil {
+		return nil, fmt.Errorf("sqlite: get oauth account: %w", err)
+	}
+	return acc, nil
+}
+
+func (a *Adapter) CreateOAuthAccount(ctx context.Context, acc *oauth.Account) error {
+	_, err := a.db.ExecContext(ctx,
+		`INSERT INTO oauth_accounts (id, user_id, provider, provider_id, created_at)
+		 VALUES (?, ?, ?, ?, ?)`,
+		acc.ID, acc.UserID, acc.Provider, acc.ProviderID, acc.CreatedAt.UTC(),
+	)
+	if err != nil {
+		return fmt.Errorf("sqlite: create oauth account: %w", err)
+	}
+	return nil
+}
+
+func (a *Adapter) GetOAuthAccountsByUserID(ctx context.Context, userID string) ([]*oauth.Account, error) {
+	rows, err := a.db.QueryContext(ctx,
+		`SELECT id, user_id, provider, provider_id, created_at
+		 FROM oauth_accounts WHERE user_id = ?`, userID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("sqlite: get oauth accounts by user id: %w", err)
+	}
+	defer rows.Close()
+
+	var accounts []*oauth.Account
+	for rows.Next() {
+		acc := &oauth.Account{}
+		if err := rows.Scan(&acc.ID, &acc.UserID, &acc.Provider, &acc.ProviderID, &acc.CreatedAt); err != nil {
+			return nil, fmt.Errorf("sqlite: scan oauth account: %w", err)
+		}
+		accounts = append(accounts, acc)
+	}
+	return accounts, nil
 }

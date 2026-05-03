@@ -213,12 +213,14 @@ func (p *Plugin) findOrCreateUser(
 	// 2. User with matching email?
 	user, err := a.DB().GetUserByEmail(ctx, pu.Email)
 	if err != nil {
-		// 3. Brand new user
+		// 3. Brand-new user
 		user = &authoritah.User{
 			ID:        generateID(),
 			Email:     pu.Email,
 			Name:      pu.Name,
 			AvatarURL: pu.AvatarURL,
+			CreatedAt: time.Now(),
+			UpdatedAt: time.Now(),
 		}
 		if err := a.DB().CreateUser(ctx, user); err != nil {
 			return nil, nil, fmt.Errorf("oauth: create user: %w", err)
