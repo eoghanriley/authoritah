@@ -81,7 +81,6 @@ func (p *Plugin) Routes() []authoritah.Route {
 	return []authoritah.Route{
 		{Method: "POST", Path: "/credentials/sign-up", Handler: p.handleSignUp},
 		{Method: "POST", Path: "/credentials/sign-in", Handler: p.handleSignIn},
-		{Method: "POST", Path: "/credentials/sign-out", Handler: p.handleSignOut, RequireAuth: true},
 	}
 }
 
@@ -193,27 +192,6 @@ func (p *Plugin) handleSignIn(a *authoritah.Auth) func(http.ResponseWriter, *htt
 
 		_ = a.RunHooks(ctx, authoritah.HookAfterSignIn, authoritah.HookData{"user": user, "session": session})
 		writeJSON(w, http.StatusOK, sessionResponse{Session: session, User: user})
-	}
-}
-
-func (p *Plugin) handleSignOut(a *authoritah.Auth) func(http.ResponseWriter, *http.Request) {
-	return func(w http.ResponseWriter, r *http.Request) {
-		session := authoritah.GetSession(r)
-		if session == nil {
-			httpError(w, "not authenticated", http.StatusUnauthorized)
-			return
-		}
-
-		ctx := r.Context()
-		_ = a.RunHooks(ctx, authoritah.HookBeforeSignOut, authoritah.HookData{"session": session})
-
-		if err := a.Sessions().Revoke(ctx, session.Token); err != nil {
-			httpError(w, "internal error", http.StatusInternalServerError)
-			return
-		}
-
-		_ = a.RunHooks(ctx, authoritah.HookAfterSignOut, authoritah.HookData{"session": session})
-		w.WriteHeader(http.StatusNoContent)
 	}
 }
 

@@ -5,7 +5,6 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -274,38 +273,6 @@ func TestSignIn_InvalidJSON(t *testing.T) {
 
 	if w.Code != http.StatusBadRequest {
 		t.Errorf("want 400, got %d", w.Code)
-	}
-}
-
-func TestSignOut_Success(t *testing.T) {
-	a, _ := buildAuth(t)
-	resp := signUp(t, a, "eve@example.com", "password")
-
-	req := httptest.NewRequest("POST", "/credentials/sign-out", nil)
-	req.Header.Set("Authorization", "Bearer "+resp.Session.Token)
-	w := httptest.NewRecorder()
-	a.ServeHTTP(w, req)
-
-	if w.Code != http.StatusNoContent {
-		t.Fatalf("want 204, got %d: %s", w.Code, w.Body.String())
-	}
-
-	// Token should no longer be valid.
-	_, err := a.Sessions().Validate(context.Background(), resp.Session.Token)
-	if !errors.Is(err, authoritah.ErrSessionNotFound) {
-		t.Errorf("want ErrSessionNotFound after sign-out, got %v", err)
-	}
-}
-
-func TestSignOut_Unauthenticated(t *testing.T) {
-	a, _ := buildAuth(t)
-
-	req := httptest.NewRequest("POST", "/credentials/sign-out", nil)
-	w := httptest.NewRecorder()
-	a.ServeHTTP(w, req)
-
-	if w.Code != http.StatusUnauthorized {
-		t.Errorf("want 401 for unauthenticated sign-out, got %d", w.Code)
 	}
 }
 

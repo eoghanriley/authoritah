@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"errors"
 	"log/slog"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"testing"
 	"time"
@@ -287,5 +289,114 @@ func TestAuth_Hooks_IsolatedByType(t *testing.T) {
 	_ = a.RunHooks(context.Background(), authoritah.HookAfterSignIn, nil)
 	if called {
 		t.Error("hook registered for AfterSignUp should not fire for AfterSignIn")
+	}
+}
+
+func newTestAuth(t *testing.T) *authoritah.Auth {
+	t.Helper()
+	auth, err := authoritah.New(
+		authoritah.WithSessionStore(authoritah.NewMemoryStore(time.Hour)),
+	)
+	if err != nil {
+		t.Fatalf("authoritah.New: %v", err)
+	}
+	return auth
+}
+
+func TestSignOut_NoToken(t *testing.T) {
+	auth := newTestAuth(t)
+
+	r := httptest.NewRequest("POST", "/sign-out", nil)
+	w := httptest.NewRecorder()
+
+	auth.ServeHTTP(w, r)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Errorf("expected 401, got %d", w.Code)
+	}
+}
+
+func TestSignOut_ValidBearerToken(t *testing.T) {
+	auth := newTestAuth(t)
+	ctx := context.Background()
+
+	session, err := auth.Sessions().Create(ctx, "user-123", nil)
+	if err != nil {
+		t.Fatalf("create session: %v", err)
+	}
+
+	r := httptest.NewRequest("POST", "/sign-out", nil)
+	r.Header.Set("Authorization", "Bearer "+session.Token)
+	w := httptest.NewRecorder()
+
+	auth.ServeHTTP(w, r)
+
+	if w.Code != http.StatusNoContent {
+		t.Errorf("expected 204, got %d", w.Code)
+	}
+
+	_, err = auth.Sessions().Validate(ctx, session.Token)
+	if !errors.Is(err, authoritah.ErrSessionNotFound) {
+		t.Errorf("expected ErrSessionNotFound after sign-out, got %v", err)
+	}
+}
+
+func TestSignOut_ValidCookieToken(t *testing.T) {
+	auth := newTestAuth(t)
+	ctx := context.Background()
+
+	session, err := auth.Sessions().Create(ctx, "user-456", nil)
+	if err != nil {
+		t.Fatalf("create session: %v", err)
+	}
+
+	r := httptest.NewRequest("POST", "/sign-out", nil)
+	r.AddCookie(&http.Cookie{Name: "authoritah_session", Value: session.Token})
+	w := httptest.NewRecorder()
+
+	auth.ServeHTTP(w, r)
+
+	if w.Code != http.StatusNoContent {
+		t.Errorf("expected 204, got %d", w.Code)
+	}
+
+	_, err = auth.Sessions().Validate(ctx, session.Token)
+	if !errors.Is(err, authoritah.ErrSessionNotFound) {
+		t.Errorf("expected ErrSessionNotFound after sign-out, got %v", err)
+	}
+}
+
+func TestSignOut_HooksAreFired(t *testing.T) {
+	auth := newTestAuth(t)
+	ctx := context.Background()
+
+	beforeFired := false
+	afterFired := false
+
+	auth.RegisterHook(authoritah.HookBeforeSignOut, func(ctx context.Context, data authoritah.HookData) error {
+		beforeFired = true
+		return nil
+	})
+	auth.RegisterHook(authoritah.HookAfterSignOut, func(ctx context.Context, data authoritah.HookData) error {
+		afterFired = true
+		return nil
+	})
+
+	session, err := auth.Sessions().Create(ctx, "user-789", nil)
+	if err != nil {
+		t.Fatalf("create session: %v", err)
+	}
+
+	r := httptest.NewRequest("POST", "/sign-out", nil)
+	r.Header.Set("Authorization", "Bearer "+session.Token)
+	w := httptest.NewRecorder()
+
+	auth.ServeHTTP(w, r)
+
+	if !beforeFired {
+		t.Error("HookBeforeSignOut was not fired")
+	}
+	if !afterFired {
+		t.Error("HookAfterSignOut was not fired")
 	}
 }

@@ -106,6 +106,9 @@ func New(opts ...Option) (*Auth, error) {
 		a.config.GooseMigrationDialect = "postgres"
 	}
 
+	// Core routes
+	a.mux.HandleFunc("POST /sign-out", a.RequireAuth(http.HandlerFunc(a.handleSignOut)).ServeHTTP)
+
 	for _, p := range a.plugins {
 		if err := p.Init(a); err != nil {
 			return nil, fmt.Errorf("authoritah: init plugin %q: %w", p.ID(), err)
@@ -221,6 +224,21 @@ func (a *Auth) runMigrations(ctx context.Context, pluginID string, fsys embed.FS
 		)
 	}
 	return nil
+}
+
+func (a *Auth) handleSignOut(w http.ResponseWriter, r *http.Request) {
+	session := GetSession(r)
+
+	ctx := r.Context()
+	_ = a.RunHooks(ctx, HookBeforeSignOut, HookData{"session": session})
+
+	if err := a.sessions.Revoke(ctx, session.Token); err != nil {
+		http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
+		return
+	}
+
+	_ = a.RunHooks(ctx, HookAfterSignOut, HookData{"session": session})
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (a *Auth) mountRoutes(p Plugin) {
