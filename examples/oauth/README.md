@@ -30,7 +30,7 @@ go run ./examples/oauth
 Open your browser and navigate to:
 http://localhost:8080/auth/oauth/github
 
-You'll be redirected to GitHub to authorize the app. After approving, GitHub sends you back and you'll get a JSON response with your session token and user info.
+You'll be redirected to GitHub to authorize the app. After approving, GitHub sends you back, and you'll get a JSON response with your session token and user info.
 
 ### Call a protected route
 
