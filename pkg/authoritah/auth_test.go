@@ -157,9 +157,9 @@ func TestPlugin(t *testing.T) {
 			wantFound: true,
 		},
 		{
-			name:    "not found",
+			name:     "not found",
 			lookupID: "nonexistent",
-			wantErr: authoritah.ErrPluginNotFound,
+			wantErr:  authoritah.ErrPluginNotFound,
 		},
 	}
 
