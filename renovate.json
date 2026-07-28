@@ -16,7 +16,8 @@
     },
     {
       "description": "Set minimum age of a release before upgrading",
-      "minimumReleaseAge": 3
+      "matchPackageNames": "*",
+      "minimumReleaseAge": "7"
     }
   ]
 }
