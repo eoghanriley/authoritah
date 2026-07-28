@@ -9,10 +9,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/eoghanriley/authoritah/pkg/authoritah"
 )
 
-// mockDB is a minimal in-memory authoritah.Database for tests.
+// ---- shared test doubles ---------------------------------------------------
+
 type mockDB struct {
 	users    map[string]*authoritah.User
 	sessions map[string]*authoritah.Session
@@ -29,7 +32,6 @@ func (m *mockDB) CreateUser(_ context.Context, u *authoritah.User) error {
 	m.users[u.ID] = u
 	return nil
 }
-
 func (m *mockDB) GetUserByID(_ context.Context, id string) (*authoritah.User, error) {
 	u, ok := m.users[id]
 	if !ok {
@@ -37,7 +39,6 @@ func (m *mockDB) GetUserByID(_ context.Context, id string) (*authoritah.User, er
 	}
 	return u, nil
 }
-
 func (m *mockDB) GetUserByEmail(_ context.Context, email string) (*authoritah.User, error) {
 	for _, u := range m.users {
 		if u.Email == email {
@@ -46,22 +47,18 @@ func (m *mockDB) GetUserByEmail(_ context.Context, email string) (*authoritah.Us
 	}
 	return nil, authoritah.ErrUserNotFound
 }
-
 func (m *mockDB) UpdateUser(_ context.Context, u *authoritah.User) error {
 	m.users[u.ID] = u
 	return nil
 }
-
 func (m *mockDB) DeleteUser(_ context.Context, id string) error {
 	delete(m.users, id)
 	return nil
 }
-
 func (m *mockDB) CreateSession(_ context.Context, s *authoritah.Session) error {
 	m.sessions[s.Token] = s
 	return nil
 }
-
 func (m *mockDB) GetSession(_ context.Context, token string) (*authoritah.Session, error) {
 	s, ok := m.sessions[token]
 	if !ok {
@@ -69,12 +66,10 @@ func (m *mockDB) GetSession(_ context.Context, token string) (*authoritah.Sessio
 	}
 	return s, nil
 }
-
 func (m *mockDB) DeleteSession(_ context.Context, token string) error {
 	delete(m.sessions, token)
 	return nil
 }
-
 func (m *mockDB) DeleteSessionsByUserID(_ context.Context, userID string) error {
 	for tok, s := range m.sessions {
 		if s.UserID == userID {
@@ -83,10 +78,8 @@ func (m *mockDB) DeleteSessionsByUserID(_ context.Context, userID string) error 
 	}
 	return nil
 }
-
 func (m *mockDB) SQLDB() *sql.DB { return nil }
 
-// stubPlugin is a no-op Plugin for testing.
 type stubPlugin struct {
 	id      string
 	initErr error
@@ -96,20 +89,20 @@ func (s *stubPlugin) ID() string                    { return s.id }
 func (s *stubPlugin) Routes() []authoritah.Route    { return nil }
 func (s *stubPlugin) Init(_ *authoritah.Auth) error { return s.initErr }
 
+// ---- TestNew ---------------------------------------------------------------
+
 func TestNew_Defaults(t *testing.T) {
+	t.Parallel()
+
 	a, err := authoritah.New()
-	if err != nil {
-		t.Fatalf("New(): %v", err)
-	}
-	if a.Logger() == nil {
-		t.Error("expected default logger to be non-nil")
-	}
-	if a.Config().GooseMigrationDialect != "postgres" {
-		t.Errorf("want default dialect %q, got %q", "postgres", a.Config().GooseMigrationDialect)
-	}
+	require.NoError(t, err)
+	require.NotNil(t, a.Logger())
+	require.Equal(t, "postgres", a.Config().GooseMigrationDialect)
 }
 
 func TestNew_WithOptions(t *testing.T) {
+	t.Parallel()
+
 	db := newMockDB()
 	store := authoritah.NewMemoryStore(time.Hour)
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
@@ -121,85 +114,82 @@ func TestNew_WithOptions(t *testing.T) {
 		authoritah.WithLogger(logger),
 		authoritah.WithConfig(cfg),
 	)
-	if err != nil {
-		t.Fatalf("New(): %v", err)
-	}
-
-	if a.DB() != db {
-		t.Error("DB() should return the provided database")
-	}
-	if a.Sessions() != store {
-		t.Error("Sessions() should return the provided session store")
-	}
-	if a.Logger() != logger {
-		t.Error("Logger() should return the provided logger")
-	}
-	if a.Config().BaseURL != "https://example.com" {
-		t.Errorf("Config().BaseURL: want %q, got %q", "https://example.com", a.Config().BaseURL)
-	}
-	if a.Config().GooseMigrationDialect != "sqlite3" {
-		t.Errorf("Config().GooseMigrationDialect: want %q, got %q", "sqlite3", a.Config().GooseMigrationDialect)
-	}
+	require.NoError(t, err)
+	require.Equal(t, db, a.DB())
+	require.Equal(t, store, a.Sessions())
+	require.Equal(t, logger, a.Logger())
+	require.Equal(t, "https://example.com", a.Config().BaseURL)
+	require.Equal(t, "sqlite3", a.Config().GooseMigrationDialect)
 }
 
 func TestNew_DefaultSessionStore(t *testing.T) {
-	db := newMockDB()
-	a, err := authoritah.New(authoritah.WithDatabase(db))
-	if err != nil {
-		t.Fatalf("New(): %v", err)
-	}
-	if a.Sessions() == nil {
-		t.Error("expected a DatabaseStore to be created automatically when db is provided without a session store")
-	}
+	t.Parallel()
+
+	a, err := authoritah.New(authoritah.WithDatabase(newMockDB()))
+	require.NoError(t, err)
+	require.NotNil(t, a.Sessions(), "expected DatabaseStore created automatically when db is set")
 }
 
 func TestNew_PluginInitFailure(t *testing.T) {
+	t.Parallel()
+
 	initErr := errors.New("init failed")
 	_, err := authoritah.New(
 		authoritah.WithPlugins(&stubPlugin{id: "bad", initErr: initErr}),
 	)
-	if err == nil {
-		t.Fatal("expected error when plugin Init fails")
+	require.ErrorIs(t, err, initErr)
+}
+
+// ---- TestPlugin ------------------------------------------------------------
+
+func TestPlugin(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		lookupID  string
+		wantErr   error
+		wantFound bool
+	}{
+		{
+			name:      "found",
+			lookupID:  "my-plugin",
+			wantFound: true,
+		},
+		{
+			name:    "not found",
+			lookupID: "nonexistent",
+			wantErr: authoritah.ErrPluginNotFound,
+		},
 	}
-	if !errors.Is(err, initErr) {
-		t.Errorf("want wrapped initErr in error chain, got %v", err)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			a, err := authoritah.New(
+				authoritah.WithPlugins(&stubPlugin{id: "my-plugin"}),
+			)
+			require.NoError(t, err)
+
+			p, err := a.Plugin(tt.lookupID)
+			if tt.wantErr != nil {
+				require.ErrorIs(t, err, tt.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, tt.lookupID, p.ID())
+		})
 	}
 }
 
-func TestAuth_Plugin_Found(t *testing.T) {
-	a, err := authoritah.New(
-		authoritah.WithPlugins(&stubPlugin{id: "my-plugin"}),
-	)
-	if err != nil {
-		t.Fatalf("New(): %v", err)
-	}
+// ---- TestHooks -------------------------------------------------------------
 
-	p, err := a.Plugin("my-plugin")
-	if err != nil {
-		t.Fatalf("Plugin(): %v", err)
-	}
-	if p.ID() != "my-plugin" {
-		t.Errorf("want ID %q, got %q", "my-plugin", p.ID())
-	}
-}
+func TestHooks_RunInOrder(t *testing.T) {
+	t.Parallel()
 
-func TestAuth_Plugin_NotFound(t *testing.T) {
 	a, err := authoritah.New()
-	if err != nil {
-		t.Fatalf("New(): %v", err)
-	}
-
-	_, err = a.Plugin("nonexistent")
-	if !errors.Is(err, authoritah.ErrPluginNotFound) {
-		t.Errorf("want ErrPluginNotFound, got %v", err)
-	}
-}
-
-func TestAuth_Hooks_RunInOrder(t *testing.T) {
-	a, err := authoritah.New()
-	if err != nil {
-		t.Fatalf("New(): %v", err)
-	}
+	require.NoError(t, err)
 
 	var order []int
 	a.RegisterHook(authoritah.HookAfterSignUp, func(_ context.Context, _ authoritah.HookData) error {
@@ -211,19 +201,15 @@ func TestAuth_Hooks_RunInOrder(t *testing.T) {
 		return nil
 	})
 
-	if err := a.RunHooks(context.Background(), authoritah.HookAfterSignUp, nil); err != nil {
-		t.Fatalf("RunHooks: %v", err)
-	}
-	if len(order) != 2 || order[0] != 1 || order[1] != 2 {
-		t.Errorf("want hooks run in order [1 2], got %v", order)
-	}
+	require.NoError(t, a.RunHooks(context.Background(), authoritah.HookAfterSignUp, nil))
+	require.Equal(t, []int{1, 2}, order)
 }
 
-func TestAuth_Hooks_AbortOnError(t *testing.T) {
+func TestHooks_AbortOnError(t *testing.T) {
+	t.Parallel()
+
 	a, err := authoritah.New()
-	if err != nil {
-		t.Fatalf("New(): %v", err)
-	}
+	require.NoError(t, err)
 
 	hookErr := errors.New("hook error")
 	secondCalled := false
@@ -236,29 +222,25 @@ func TestAuth_Hooks_AbortOnError(t *testing.T) {
 		return nil
 	})
 
-	if err := a.RunHooks(context.Background(), authoritah.HookBeforeSignUp, nil); !errors.Is(err, hookErr) {
-		t.Errorf("want hookErr in error chain, got %v", err)
-	}
-	if secondCalled {
-		t.Error("second hook should not run after first hook errors")
-	}
+	err = a.RunHooks(context.Background(), authoritah.HookBeforeSignUp, nil)
+	require.ErrorIs(t, err, hookErr)
+	require.False(t, secondCalled, "second hook must not run after first returns an error")
 }
 
-func TestAuth_Hooks_NoHandlers(t *testing.T) {
+func TestHooks_NoHandlers(t *testing.T) {
+	t.Parallel()
+
 	a, err := authoritah.New()
-	if err != nil {
-		t.Fatalf("New(): %v", err)
-	}
-	if err := a.RunHooks(context.Background(), authoritah.HookAfterSignIn, nil); err != nil {
-		t.Errorf("RunHooks with no handlers: want nil, got %v", err)
-	}
+	require.NoError(t, err)
+
+	require.NoError(t, a.RunHooks(context.Background(), authoritah.HookAfterSignIn, nil))
 }
 
-func TestAuth_Hooks_DataPropagation(t *testing.T) {
+func TestHooks_DataPropagation(t *testing.T) {
+	t.Parallel()
+
 	a, err := authoritah.New()
-	if err != nil {
-		t.Fatalf("New(): %v", err)
-	}
+	require.NoError(t, err)
 
 	var got authoritah.HookData
 	a.RegisterHook(authoritah.HookAfterSignIn, func(_ context.Context, data authoritah.HookData) error {
@@ -266,17 +248,15 @@ func TestAuth_Hooks_DataPropagation(t *testing.T) {
 		return nil
 	})
 
-	_ = a.RunHooks(context.Background(), authoritah.HookAfterSignIn, authoritah.HookData{"user_id": "u-1"})
-	if got["user_id"] != "u-1" {
-		t.Errorf("want data[user_id]=u-1, got %v", got["user_id"])
-	}
+	require.NoError(t, a.RunHooks(context.Background(), authoritah.HookAfterSignIn, authoritah.HookData{"user_id": "u-1"}))
+	require.Equal(t, "u-1", got["user_id"])
 }
 
-func TestAuth_Hooks_IsolatedByType(t *testing.T) {
+func TestHooks_IsolatedByType(t *testing.T) {
+	t.Parallel()
+
 	a, err := authoritah.New()
-	if err != nil {
-		t.Fatalf("New(): %v", err)
-	}
+	require.NoError(t, err)
 
 	called := false
 	a.RegisterHook(authoritah.HookAfterSignUp, func(_ context.Context, _ authoritah.HookData) error {
@@ -284,8 +264,6 @@ func TestAuth_Hooks_IsolatedByType(t *testing.T) {
 		return nil
 	})
 
-	_ = a.RunHooks(context.Background(), authoritah.HookAfterSignIn, nil)
-	if called {
-		t.Error("hook registered for AfterSignUp should not fire for AfterSignIn")
-	}
+	require.NoError(t, a.RunHooks(context.Background(), authoritah.HookAfterSignIn, nil))
+	require.False(t, called, "HookAfterSignUp must not fire for HookAfterSignIn")
 }

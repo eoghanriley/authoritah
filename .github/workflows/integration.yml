@@ -1,0 +1,33 @@
+name: Integration Tests
+
+on:
+  pull_request_review:
+    types: [submitted]
+  workflow_dispatch:
+
+jobs:
+  integration:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    # Run when triggered manually, or when a PR is approved by someone with write access.
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.review.state == 'approved' &&
+       (github.event.review.author_association == 'OWNER' ||
+        github.event.review.author_association == 'MEMBER' ||
+        github.event.review.author_association == 'COLLABORATOR'))
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Integration Tests
+        run: make test-integration
+        env:
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}

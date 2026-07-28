@@ -2,138 +2,155 @@ package authoritah_test
 
 import (
 	"context"
-	"errors"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/eoghanriley/authoritah/pkg/authoritah"
 )
 
-func TestSession_IsExpired_Future(t *testing.T) {
-	s := &authoritah.Session{ExpiresAt: time.Now().Add(time.Hour)}
-	if s.IsExpired() {
-		t.Fatal("session with future expiry should not be expired")
-	}
-}
+func TestSession_IsExpired(t *testing.T) {
+	t.Parallel()
 
-func TestSession_IsExpired_Past(t *testing.T) {
-	s := &authoritah.Session{ExpiresAt: time.Now().Add(-time.Hour)}
-	if !s.IsExpired() {
-		t.Fatal("session with past expiry should be expired")
+	tests := []struct {
+		name      string
+		expiresAt time.Time
+		want      bool
+	}{
+		{name: "future expiry", expiresAt: time.Now().Add(time.Hour), want: false},
+		{name: "past expiry", expiresAt: time.Now().Add(-time.Hour), want: true},
+		{name: "zero time", expiresAt: time.Time{}, want: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			s := &authoritah.Session{ExpiresAt: tt.expiresAt}
+			require.Equal(t, tt.want, s.IsExpired())
+		})
 	}
 }
 
 func TestMemoryStore_Create(t *testing.T) {
+	t.Parallel()
+
 	store := authoritah.NewMemoryStore(time.Hour)
 	s, err := store.Create(context.Background(), "user-1", map[string]any{"role": "admin"})
-	if err != nil {
-		t.Fatalf("Create: %v", err)
-	}
-	if s.ID == "" {
-		t.Error("want non-empty ID")
-	}
-	if s.Token == "" {
-		t.Error("want non-empty Token")
-	}
-	if s.UserID != "user-1" {
-		t.Errorf("want UserID %q, got %q", "user-1", s.UserID)
-	}
-	if s.Meta["role"] != "admin" {
-		t.Errorf("want meta[role]=admin, got %v", s.Meta["role"])
-	}
-	if s.IsExpired() {
-		t.Error("newly created session should not be expired")
-	}
+	require.NoError(t, err)
+	require.NotEmpty(t, s.ID)
+	require.NotEmpty(t, s.Token)
+	require.Equal(t, "user-1", s.UserID)
+	require.Equal(t, "admin", s.Meta["role"])
+	require.False(t, s.IsExpired())
 }
 
 func TestMemoryStore_Create_UniqueTokens(t *testing.T) {
+	t.Parallel()
+
 	store := authoritah.NewMemoryStore(time.Hour)
-	s1, _ := store.Create(context.Background(), "user-1", nil)
-	s2, _ := store.Create(context.Background(), "user-1", nil)
-	if s1.Token == s2.Token {
-		t.Error("consecutive sessions should have distinct tokens")
-	}
+	s1, err := store.Create(context.Background(), "user-1", nil)
+	require.NoError(t, err)
+	s2, err := store.Create(context.Background(), "user-1", nil)
+	require.NoError(t, err)
+	require.NotEqual(t, s1.Token, s2.Token, "consecutive sessions must have distinct tokens")
 }
 
-func TestMemoryStore_Validate_Valid(t *testing.T) {
-	store := authoritah.NewMemoryStore(time.Hour)
-	created, _ := store.Create(context.Background(), "user-1", nil)
+func TestMemoryStore_Validate(t *testing.T) {
+	t.Parallel()
 
-	got, err := store.Validate(context.Background(), created.Token)
-	if err != nil {
-		t.Fatalf("Validate: %v", err)
+	tests := []struct {
+		name    string
+		setup   func(store *authoritah.MemoryStore) string
+		wantErr error
+	}{
+		{
+			name: "valid token",
+			setup: func(store *authoritah.MemoryStore) string {
+				s, _ := store.Create(context.Background(), "user-1", nil)
+				return s.Token
+			},
+		},
+		{
+			name: "nonexistent token",
+			setup: func(_ *authoritah.MemoryStore) string {
+				return "nonexistent"
+			},
+			wantErr: authoritah.ErrSessionNotFound,
+		},
 	}
-	if got.Token != created.Token {
-		t.Errorf("want token %q, got %q", created.Token, got.Token)
-	}
-	if got.UserID != "user-1" {
-		t.Errorf("want UserID %q, got %q", "user-1", got.UserID)
-	}
-}
 
-func TestMemoryStore_Validate_NotFound(t *testing.T) {
-	store := authoritah.NewMemoryStore(time.Hour)
-	_, err := store.Validate(context.Background(), "nonexistent")
-	if !errors.Is(err, authoritah.ErrSessionNotFound) {
-		t.Errorf("want ErrSessionNotFound, got %v", err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			store := authoritah.NewMemoryStore(time.Hour)
+			token := tt.setup(store)
+
+			got, err := store.Validate(context.Background(), token)
+			if tt.wantErr != nil {
+				require.ErrorIs(t, err, tt.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, token, got.Token)
+		})
 	}
 }
 
 func TestMemoryStore_Validate_Expired(t *testing.T) {
+	t.Parallel()
+
 	store := authoritah.NewMemoryStore(time.Millisecond)
-	created, _ := store.Create(context.Background(), "user-1", nil)
+	s, err := store.Create(context.Background(), "user-1", nil)
+	require.NoError(t, err)
 
 	time.Sleep(10 * time.Millisecond)
 
-	_, err := store.Validate(context.Background(), created.Token)
-	if !errors.Is(err, authoritah.ErrSessionExpired) {
-		t.Errorf("want ErrSessionExpired, got %v", err)
-	}
+	_, err = store.Validate(context.Background(), s.Token)
+	require.ErrorIs(t, err, authoritah.ErrSessionExpired, "expired session should return ErrSessionExpired")
 
-	// Expired session is cleaned up; subsequent call returns not found.
-	_, err = store.Validate(context.Background(), created.Token)
-	if !errors.Is(err, authoritah.ErrSessionNotFound) {
-		t.Errorf("want ErrSessionNotFound after expiry cleanup, got %v", err)
-	}
+	// Expired session is cleaned up; next call returns not found.
+	_, err = store.Validate(context.Background(), s.Token)
+	require.ErrorIs(t, err, authoritah.ErrSessionNotFound, "cleaned-up session should return ErrSessionNotFound")
 }
 
 func TestMemoryStore_Revoke(t *testing.T) {
-	store := authoritah.NewMemoryStore(time.Hour)
-	s, _ := store.Create(context.Background(), "user-1", nil)
+	t.Parallel()
 
-	if err := store.Revoke(context.Background(), s.Token); err != nil {
-		t.Fatalf("Revoke: %v", err)
-	}
-	_, err := store.Validate(context.Background(), s.Token)
-	if !errors.Is(err, authoritah.ErrSessionNotFound) {
-		t.Errorf("want ErrSessionNotFound after revoke, got %v", err)
-	}
+	store := authoritah.NewMemoryStore(time.Hour)
+	s, err := store.Create(context.Background(), "user-1", nil)
+	require.NoError(t, err)
+
+	require.NoError(t, store.Revoke(context.Background(), s.Token))
+
+	_, err = store.Validate(context.Background(), s.Token)
+	require.ErrorIs(t, err, authoritah.ErrSessionNotFound)
 }
 
-func TestMemoryStore_Revoke_Unknown(t *testing.T) {
+func TestMemoryStore_Revoke_UnknownToken(t *testing.T) {
+	t.Parallel()
+
 	store := authoritah.NewMemoryStore(time.Hour)
-	if err := store.Revoke(context.Background(), "no-such-token"); err != nil {
-		t.Errorf("revoking unknown token should not error, got %v", err)
-	}
+	require.NoError(t, store.Revoke(context.Background(), "no-such-token"),
+		"revoking an unknown token should not error")
 }
 
 func TestMemoryStore_RevokeAll(t *testing.T) {
+	t.Parallel()
+
 	store := authoritah.NewMemoryStore(time.Hour)
 	s1, _ := store.Create(context.Background(), "user-1", nil)
 	s2, _ := store.Create(context.Background(), "user-1", nil)
 	s3, _ := store.Create(context.Background(), "user-2", nil)
 
-	if err := store.RevokeAll(context.Background(), "user-1"); err != nil {
-		t.Fatalf("RevokeAll: %v", err)
-	}
+	require.NoError(t, store.RevokeAll(context.Background(), "user-1"))
 
-	for _, tok := range []string{s1.Token, s2.Token} {
-		if _, err := store.Validate(context.Background(), tok); !errors.Is(err, authoritah.ErrSessionNotFound) {
-			t.Errorf("token %q: want ErrSessionNotFound, got %v", tok, err)
-		}
-	}
+	_, err := store.Validate(context.Background(), s1.Token)
+	require.ErrorIs(t, err, authoritah.ErrSessionNotFound, "user-1 session 1 should be revoked")
 
-	if _, err := store.Validate(context.Background(), s3.Token); err != nil {
-		t.Errorf("user-2 session should still be valid, got %v", err)
-	}
+	_, err = store.Validate(context.Background(), s2.Token)
+	require.ErrorIs(t, err, authoritah.ErrSessionNotFound, "user-1 session 2 should be revoked")
+
+	_, err = store.Validate(context.Background(), s3.Token)
+	require.NoError(t, err, "user-2 session should be unaffected")
 }
