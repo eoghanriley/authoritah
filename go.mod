@@ -7,7 +7,7 @@ require (
 	github.com/pressly/goose/v3 v3.27.3
 	github.com/stretchr/testify v1.11.1
 	golang.org/x/crypto v0.54.0
-	modernc.org/sqlite v1.54.0
+	modernc.org/sqlite v1.55.0
 )
 
 require (
